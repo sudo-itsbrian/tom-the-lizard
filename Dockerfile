@@ -7,8 +7,11 @@ RUN npm ci --production
 
 COPY . .
 
-RUN mkdir -p scripts
+ENV DATA_DIR=/app/data
+RUN mkdir -p /app/data/scripts
 
 EXPOSE 3100
+
+VOLUME ["/app/data"]
 
 CMD ["node", "index.js"]

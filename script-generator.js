@@ -3,8 +3,7 @@ const Anthropic = require("@anthropic-ai/sdk");
 const fs = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
-
-const SCRIPTS_DIR = path.join(__dirname, "scripts");
+const { SCRIPTS_DIR, dataPath } = require("./data-dir");
 
 const SYSTEM_PROMPT = `You are a Node.js script generator for Bot Lobster, a Zalo chatbot assistant.
 
@@ -26,7 +25,8 @@ RULES:
 
 PLACES (CRITICAL -- NEVER hardcode coordinates):
 - When user mentions "home", "work", or any named place, ALWAYS read from places.json:
-  const places = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "places.json"), "utf8"));
+  const dataDir = process.env.DATA_DIR || require("path").join(__dirname, "..", "data");
+  const places = JSON.parse(require("fs").readFileSync(require("path").join(dataDir, "places.json"), "utf8"));
   // places.home = { name, coords, address }
   // places.work = { name, coords, address }
   // places.custom = [{ label, name, coords, address }, ...]
@@ -38,7 +38,7 @@ OUTPUT: Return ONLY the JavaScript code. No markdown, no explanation, no backtic
 
 function getPlacesContext() {
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "places.json"), "utf8"));
+    const cfg = JSON.parse(fs.readFileSync(dataPath("places.json"), "utf8"));
     const lines = [];
     if (cfg.home) lines.push(`- "home" = ${cfg.home.name} at ${cfg.home.coords} (${cfg.home.address})`);
     if (cfg.work) lines.push(`- "work" = ${cfg.work.name} at ${cfg.work.coords} (${cfg.work.address})`);
@@ -74,7 +74,6 @@ async function generateTaskScript(taskId, description) {
   code = code.replace(/^```(?:javascript|js)?\n?/i, "").replace(/\n?```$/i, "").trim();
 
   // Save to scripts directory
-  if (!fs.existsSync(SCRIPTS_DIR)) fs.mkdirSync(SCRIPTS_DIR, { recursive: true });
   const filename = `task-${taskId}.js`;
   const filepath = path.join(SCRIPTS_DIR, filename);
   fs.writeFileSync(filepath, code);

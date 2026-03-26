@@ -3,8 +3,9 @@ const { CronJob } = require("cron");
 const { execFile } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const { dataPath, SCRIPTS_DIR } = require("./data-dir");
 
-const TASKS_FILE = path.join(__dirname, "tasks.json");
+const TASKS_FILE = dataPath("tasks.json");
 const jobs = new Map();
 let tasks = [];
 
@@ -44,7 +45,10 @@ function startJob(task) {
       console.log(`[scheduler] Running: ${task.name}`);
       task.lastRun = new Date().toISOString();
 
-      execFile("node", [path.join(__dirname, task.script)], {
+      const scriptPath = task.script.startsWith("scripts/")
+        ? path.join(SCRIPTS_DIR, path.basename(task.script))
+        : path.join(__dirname, task.script);
+      execFile("node", [scriptPath], {
         timeout: 60_000,
         env: process.env,
       }, (err, stdout, stderr) => {
@@ -112,7 +116,10 @@ function runTaskNow(id) {
   task.lastRun = new Date().toISOString();
 
   return new Promise((resolve, reject) => {
-    execFile("node", [path.join(__dirname, task.script)], {
+    const scriptPath = task.script.startsWith("scripts/")
+      ? path.join(SCRIPTS_DIR, path.basename(task.script))
+      : path.join(__dirname, task.script);
+    execFile("node", [scriptPath], {
       timeout: 60_000,
       env: process.env,
     }, (err, stdout) => {

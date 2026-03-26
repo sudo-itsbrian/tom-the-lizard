@@ -3,6 +3,7 @@ const { execFile } = require("child_process");
 const path = require("path");
 const ZaloBot = require("node-zalo-bot");
 const Anthropic = require("@anthropic-ai/sdk");
+const { dataPath } = require("./data-dir");
 const { chat, ensureJira } = require("./claude-chat");
 const { state, addMessage } = require("./bot-state");
 const { startDashboard } = require("./dashboard/server");
@@ -19,7 +20,7 @@ function saveChatId(chatId) {
   MY_CHAT_ID = String(chatId);
   process.env.MY_CHAT_ID = MY_CHAT_ID;
   state.zalo.chatId = MY_CHAT_ID;
-  const envPath = path.join(__dirname, ".env");
+  const envPath = dataPath(".env");
   const lines = fs.readFileSync(envPath, "utf8").split("\n");
   const idx = lines.findIndex((l) => l.startsWith("MY_CHAT_ID="));
   if (idx >= 0) lines[idx] = `MY_CHAT_ID=${MY_CHAT_ID}`;
@@ -78,7 +79,7 @@ function handleWord(chatId) {
   // Read word config
   let categories = ["Business", "Technology", "Daily Life"];
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "word-config.json"), "utf8"));
+    const cfg = JSON.parse(fs.readFileSync(dataPath("word-config.json"), "utf8"));
     const enabled = cfg.categories.filter((c) => c.enabled).map((c) => c.name);
     if (enabled.length > 0) categories = enabled;
   } catch {}

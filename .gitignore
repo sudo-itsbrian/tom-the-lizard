@@ -5,7 +5,5 @@ node_modules/
 .DS_Store
 plans/
 maps-api-research-report.md
+data/
 scripts/
-places.json
-tasks.json
-word-config.json

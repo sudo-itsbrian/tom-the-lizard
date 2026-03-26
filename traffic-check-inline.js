@@ -9,7 +9,8 @@ const path = require("path");
 // Load places from config, fallback to hardcoded defaults
 let homePlace, workPlace;
 try {
-  const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "places.json"), "utf8"));
+  const dataDir = process.env.DATA_DIR || path.join(__dirname, "data");
+  const cfg = JSON.parse(fs.readFileSync(path.join(dataDir, "places.json"), "utf8"));
   homePlace = cfg.home;
   workPlace = cfg.work;
 } catch {

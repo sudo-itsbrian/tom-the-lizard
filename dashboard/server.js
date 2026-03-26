@@ -4,12 +4,13 @@ const fs = require("fs");
 const { state, events, getStatus, getConfig, setConfig, getMessages } = require("../bot-state");
 const { getTasks, addTask, updateTask, deleteTask, runTaskNow } = require("../scheduler");
 const { generateTaskScript } = require("../script-generator");
+const { dataPath } = require("../data-dir");
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const ENV_PATH = path.join(__dirname, "..", ".env");
+const ENV_PATH = dataPath(".env");
 
 function maskSecret(val) {
   if (!val || val.length < 8) return val ? "****" : "";
@@ -55,6 +56,9 @@ app.get("/api/onboarding-status", (req, res) => {
 if (!fs.existsSync(ENV_PATH)) {
   fs.writeFileSync(ENV_PATH, "# Tom The Lizard config\n");
 }
+
+// Also load .env from data dir on startup (for container deployments)
+require("dotenv").config({ path: ENV_PATH, override: false });
 
 // --- API Routes ---
 
@@ -221,7 +225,7 @@ app.post("/api/tasks/:id/run", (req, res) => {
 });
 
 // --- Places API ---
-const PLACES_FILE = path.join(__dirname, "..", "places.json");
+const PLACES_FILE = dataPath("places.json");
 
 function readPlaces() {
   try {
@@ -285,7 +289,7 @@ app.delete("/api/places/custom/:idx", (req, res) => {
 });
 
 // --- Word Config ---
-const WORD_CONFIG_FILE = path.join(__dirname, "..", "word-config.json");
+const WORD_CONFIG_FILE = dataPath("word-config.json");
 
 function readWordConfig() {
   try {
