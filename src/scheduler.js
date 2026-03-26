@@ -3,7 +3,7 @@ const { CronJob } = require("cron");
 const { execFile } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const { dataPath, SCRIPTS_DIR } = require("./data-dir");
+const { dataPath, SCRIPTS_DIR, ROOT } = require("./data-dir");
 
 const TASKS_FILE = dataPath("tasks.json");
 const jobs = new Map();
@@ -18,7 +18,7 @@ function loadTasks() {
         id: "morning-traffic",
         name: "Morning Traffic",
         cron: "28 8 * * 1-5",
-        script: "traffic-check.js",
+        script: "src/traffic.js --send",
         enabled: true,
         lastRun: null,
         lastResult: null,
@@ -30,6 +30,13 @@ function loadTasks() {
 
 function saveTasks() {
   fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
+}
+
+function resolveScript(script) {
+  if (script.startsWith("scripts/")) {
+    return path.join(SCRIPTS_DIR, path.basename(script));
+  }
+  return path.join(ROOT, script);
 }
 
 function startJob(task) {
@@ -45,10 +52,11 @@ function startJob(task) {
       console.log(`[scheduler] Running: ${task.name}`);
       task.lastRun = new Date().toISOString();
 
-      const scriptPath = task.script.startsWith("scripts/")
-        ? path.join(SCRIPTS_DIR, path.basename(task.script))
-        : path.join(__dirname, task.script);
-      execFile("node", [scriptPath], {
+      const parts = task.script.split(/\s+/);
+      const scriptPath = resolveScript(parts[0]);
+      const args = [scriptPath, ...parts.slice(1)];
+
+      execFile("node", args, {
         timeout: 60_000,
         env: process.env,
       }, (err, stdout, stderr) => {
@@ -116,10 +124,11 @@ function runTaskNow(id) {
   task.lastRun = new Date().toISOString();
 
   return new Promise((resolve, reject) => {
-    const scriptPath = task.script.startsWith("scripts/")
-      ? path.join(SCRIPTS_DIR, path.basename(task.script))
-      : path.join(__dirname, task.script);
-    execFile("node", [scriptPath], {
+    const parts = task.script.split(/\s+/);
+    const scriptPath = resolveScript(parts[0]);
+    const args = [scriptPath, ...parts.slice(1)];
+
+    execFile("node", args, {
       timeout: 60_000,
       env: process.env,
     }, (err, stdout) => {

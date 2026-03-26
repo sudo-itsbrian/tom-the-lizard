@@ -13,24 +13,24 @@ async function connect() {
   if (!jiraToken) throw new Error("JIRA_API_TOKEN not set");
 
   const transport = new StdioClientTransport({
-    command: "/opt/homebrew/bin/uvx",
+    command: process.env.UVX_PATH || "uvx",
     args: [
       "mcp-atlassian",
-      "--jira-url", "https://vnggames.atlassian.net",
+      "--jira-url", process.env.JIRA_BASE_URL || "https://vnggames.atlassian.net",
       "--jira-username", process.env.JIRA_EMAIL || "dungtva@vng.com.vn",
       "--jira-token", jiraToken,
-      "--confluence-url", "https://vnggames.atlassian.net/wiki",
+      "--confluence-url", (process.env.JIRA_BASE_URL || "https://vnggames.atlassian.net") + "/wiki",
       "--confluence-username", process.env.JIRA_EMAIL || "dungtva@vng.com.vn",
       "--confluence-token", jiraToken,
     ],
   });
 
-  client = new Client({ name: "lobster-bot", version: "1.0.0" });
+  client = new Client({ name: "tom-bot", version: "1.0.0" });
   await client.connect(transport);
 
   const result = await client.listTools();
   tools = result.tools || [];
-  console.log(`[atlassian-client] Connected, ${tools.length} tools available`);
+  console.log(`[jira] Connected, ${tools.length} tools available`);
 
   // Update shared state for dashboard
   try {
@@ -41,7 +41,16 @@ async function connect() {
     state.integrations.jira.tools = jiraTools.length;
     state.integrations.confluence.connected = confTools.length > 0;
     state.integrations.confluence.tools = confTools.length;
-  } catch {};
+  } catch {}
+}
+
+async function reconnect() {
+  if (client) {
+    try { await client.close(); } catch {}
+    client = null;
+    tools = [];
+  }
+  await connect();
 }
 
 function getTools() {
@@ -60,4 +69,4 @@ async function callTool(name, args) {
     .join("\n");
 }
 
-module.exports = { connect, getTools, callTool };
+module.exports = { connect, reconnect, getTools, callTool };

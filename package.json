@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "setup": "curl -LsSf https://astral.sh/uv/install.sh | sh",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": ["zalo", "bot", "ai", "jira", "claude", "assistant"],

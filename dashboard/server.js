@@ -1,10 +1,11 @@
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
-const { state, events, getStatus, getConfig, setConfig, getMessages } = require("../bot-state");
-const { getTasks, addTask, updateTask, deleteTask, runTaskNow } = require("../scheduler");
-const { generateTaskScript } = require("../script-generator");
-const { dataPath } = require("../data-dir");
+const { state, events, getStatus, getConfig, setConfig, getMessages } = require("../src/bot-state");
+const { getTasks, addTask, updateTask, deleteTask, runTaskNow } = require("../src/scheduler");
+const { generateTaskScript } = require("../src/script-generator");
+const { dataPath } = require("../src/data-dir");
+const jiraClient = require("../src/jira-client");
 
 const app = express();
 app.use(express.json());
@@ -111,11 +112,15 @@ app.post("/api/secrets/:key", (req, res) => {
   if (![...SECRET_KEYS, ...PLAIN_KEYS].includes(key)) {
     return res.status(400).json({ error: "Unknown key" });
   }
-  if (!value || !value.trim()) {
+  const cleaned = (value || "").trim().replace(/^\*[\s*]*/, "");
+  if (!cleaned) {
     return res.status(400).json({ error: "Value cannot be empty" });
   }
-  writeEnv({ [key]: value.trim() });
-  res.json({ ok: true, masked: SECRET_KEYS.includes(key) ? maskSecret(value.trim()) : value.trim() });
+  if (/^\*{2,}/.test(cleaned)) {
+    return res.status(400).json({ error: "Cannot save masked value" });
+  }
+  writeEnv({ [key]: cleaned });
+  res.json({ ok: true, masked: SECRET_KEYS.includes(key) ? maskSecret(cleaned) : cleaned });
 });
 
 app.delete("/api/secrets/:key", (req, res) => {
@@ -166,6 +171,17 @@ app.post("/api/integrations/test", (req, res) => {
     res.json({ ok: !!process.env.TOMTOM_API_KEY });
   } else {
     res.status(400).json({ error: "Unknown integration type" });
+  }
+});
+
+// Reconnect Jira with current env vars and test
+app.post("/api/integrations/reconnect", async (req, res) => {
+  try {
+    await jiraClient.reconnect();
+    const status = getStatus();
+    res.json({ ok: status.integrations.jira.connected, tools: status.integrations.jira.tools });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
   }
 });
 
@@ -400,6 +416,13 @@ app.get("/api/events", (req, res) => {
     events.off("config", onConfig);
     clearInterval(statusInterval);
   });
+});
+
+// Restart the entire process
+app.post("/api/restart", (req, res) => {
+  res.json({ ok: true });
+  console.log("[dashboard] Restart requested, exiting...");
+  setTimeout(() => process.exit(0), 500);
 });
 
 function startDashboard(port = 3100) {

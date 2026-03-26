@@ -2,7 +2,8 @@
 const path = require("path");
 const fs = require("fs");
 
-const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const ROOT = path.join(__dirname, "..");
+const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, "data");
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -17,4 +18,4 @@ function dataPath(filename) {
   return path.join(DATA_DIR, filename);
 }
 
-module.exports = { DATA_DIR, SCRIPTS_DIR, dataPath };
+module.exports = { ROOT, DATA_DIR, SCRIPTS_DIR, dataPath };

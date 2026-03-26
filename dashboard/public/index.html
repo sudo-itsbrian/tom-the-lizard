@@ -208,33 +208,17 @@
         <span id="int-jira-tools" style="display:none"></span>
         <span id="int-conf-tools" style="display:none"></span>
         <span style="margin-left:auto"></span>
-        <button class="btn btn-sm btn-ghost" onclick="testInt('jira')">Test</button>
         <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('atlassian')">&#x2699;</button>
       </div>
       <!-- Hidden status spans for JS updates -->
       <span id="int-jira-status" style="display:none"></span>
       <span id="int-conf-status" style="display:none"></span>
       <div class="int-service-panel" id="panel-atlassian" style="display:none">
-        <div class="int-cred-row">
-          <label>Email</label>
-          <div class="int-cred-value">
-            <span id="int-jira-email" class="mono">--</span>
-            <button class="btn-icon" onclick="showSetSecret('JIRA_EMAIL','Jira Email')" title="Edit">&#x270E;</button>
-          </div>
-        </div>
-        <div class="int-cred-row">
-          <label>API Token</label>
-          <div class="int-cred-value">
-            <span id="int-jira-token" class="mono">--</span>
-            <button class="btn-icon" id="int-jira-token-btn" onclick="showSetSecret('JIRA_API_TOKEN','Jira API Token')" title="Set">+</button>
-          </div>
-        </div>
-        <div class="int-cred-row">
-          <label>Base URL</label>
-          <div class="int-cred-value">
-            <span id="int-jira-url" class="mono">--</span>
-            <button class="btn-icon" onclick="showSetSecret('JIRA_BASE_URL','Atlassian Base URL')" title="Edit">&#x270E;</button>
-          </div>
+        <div class="int-cred-row"><label>Email</label><div class="int-cred-value"><span id="int-jira-email" class="mono">--</span></div></div>
+        <div class="int-cred-row"><label>API Token</label><div class="int-cred-value"><span id="int-jira-token" class="mono">--</span></div></div>
+        <div class="int-cred-row"><label>Base URL</label><div class="int-cred-value"><span id="int-jira-url" class="mono">--</span></div></div>
+        <div style="margin-top:8px;text-align:right">
+          <button class="btn btn-sm" onclick="openAtlassianModal()">Edit</button>
         </div>
       </div>
     </div>
@@ -244,7 +228,7 @@
       <div class="int-service-header">
         <span class="svc-badge"><span class="svc-icon svc-tom">T</span>TomTom Traffic</span>
         <span id="int-tom-status" style="display:none"></span>
-        <span id="int-tom-route" class="mono" style="margin-left:auto">--</span>
+        <span style="margin-left:auto"></span>
         <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('tomtom')">&#x2699;</button>
       </div>
       <div class="int-service-panel" id="panel-tomtom" style="display:none">
@@ -252,7 +236,7 @@
           <label>API Key</label>
           <div class="int-cred-value">
             <span id="int-tom-key" class="mono">--</span>
-            <button class="btn-icon" id="int-tom-key-btn" onclick="showSetSecret('TOMTOM_API_KEY','TomTom API Key')" title="Set">+</button>
+            <button class="btn btn-sm" id="int-tom-key-btn" onclick="showSetSecret('TOMTOM_API_KEY','TomTom API Key')">Add</button>
           </div>
         </div>
 
@@ -286,7 +270,7 @@
         <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <label style="margin:0">Other Places</label>
-            <button class="btn btn-sm" onclick="showPlaceSearch('custom')">+ Add</button>
+            <button class="btn btn-sm" onclick="showPlaceSearch('custom')">Add</button>
           </div>
           <div id="custom-places-list"></div>
         </div>
@@ -346,7 +330,7 @@
     <div class="card int-service-card">
       <div class="int-service-header">
         <span class="svc-badge"><span class="svc-icon" style="background:#8b5cf6">W</span>Vocabulary</span>
-        <span class="mono" style="margin-left:auto">/word</span>
+        <span style="margin-left:auto"></span>
         <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('vocab')">&#x2699;</button>
       </div>
       <div class="int-service-panel" id="panel-vocab" style="display:none">
@@ -538,24 +522,53 @@
       <div id="cred-list"></div>
     </div>
 
-    <!-- Set Secret Modal -->
-    <div id="secret-modal" class="modal-overlay" style="display:none">
-      <div class="card modal-card">
-        <div class="card-title"><span id="secret-modal-title">Set Token</span> <span class="link" onclick="closeSecretModal()">&#x2715;</span></div>
-        <input type="hidden" id="secret-key">
-        <div class="form-group">
-          <label id="secret-label">Value</label>
-          <input type="password" id="secret-value" placeholder="Paste token here..." autocomplete="off">
-        </div>
-        <div class="modal-actions">
-          <button class="btn" onclick="closeSecretModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="saveSecret()">Save</button>
-        </div>
-      </div>
-    </div>
   </div>
 
 </main>
+
+<!-- Set Secret Modal (must be outside .view containers) -->
+<div id="secret-modal" class="modal-overlay" style="display:none">
+  <div class="card modal-card">
+    <div class="card-title"><span id="secret-modal-title">Set Token</span> <span class="link" onclick="closeSecretModal()">&#x2715;</span></div>
+    <input type="hidden" id="secret-key">
+    <div class="form-group">
+      <label id="secret-label">Value</label>
+      <input type="password" id="secret-value" placeholder="Paste token here..." autocomplete="off">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeSecretModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSecret()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Atlassian Settings Modal -->
+<div id="atlassian-modal" class="modal-overlay" style="display:none">
+  <div class="card modal-card">
+    <div class="card-title">Atlassian Settings <span class="link" onclick="closeAtlassianModal()">&#x2715;</span></div>
+    <p class="hint" style="margin-bottom:12px">Connect Jira and Confluence for project queries via Zalo.</p>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="text" id="atl-email" placeholder="you@company.com" oninput="updateAtlTestBtn()">
+    </div>
+    <div class="form-group">
+      <label>API Token</label>
+      <input type="text" id="atl-token" placeholder="Atlassian API token" autocomplete="off" oninput="onAtlTokenInput()" onfocus="onAtlTokenFocus()">
+      <div class="hint">Get it from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" style="color:var(--accent)">Atlassian API tokens</a></div>
+    </div>
+    <div class="form-group">
+      <label>Base URL</label>
+      <input type="text" id="atl-url" placeholder="https://your-org.atlassian.net" oninput="updateAtlTestBtn()">
+    </div>
+    <div id="atl-test-result" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:8px;font-size:0.85rem"></div>
+    <div class="modal-actions">
+      <button class="btn" id="atl-test-btn" onclick="testAtlassian()" disabled style="opacity:0.5">Test Connection</button>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="closeAtlassianModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveAtlassian()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 </body>

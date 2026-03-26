@@ -112,7 +112,7 @@ function updateStatusUI(d) {
 
   // Integration pills
   const pills = document.getElementById("int-pills");
-  pills.innerHTML = [
+  if (pills) pills.innerHTML = [
     intPill("Jira", d.integrations.jira.connected, d.integrations.jira.tools + " tools"),
     intPill("Confluence", d.integrations.confluence.connected, d.integrations.confluence.tools + " tools"),
     intPill("TomTom", d.integrations.tomtom.keySet, d.integrations.tomtom.keySet ? "active" : "no key"),
@@ -298,10 +298,12 @@ function updatePromptCounter() {
 
 document.getElementById("cfg-prompt")?.addEventListener("input", updatePromptCounter);
 
-function restartBot() {
-  if (confirm("Restart Bot Lobster? Active sessions will be lost.")) {
-    toast("Restarting... (manual restart needed)", false);
-  }
+async function restartBot() {
+  if (!confirm("Restart Tom? Active sessions will be lost.")) return;
+  toast("Restarting...", true);
+  try {
+    await fetch("/api/restart", { method: "POST" });
+  } catch {}
 }
 
 // --- Scheduler ---
@@ -859,15 +861,8 @@ function updateIntCredentials(data) {
   }
   // Jira token
   const tokenEl = document.getElementById("int-jira-token");
-  const tokenBtn = document.getElementById("int-jira-token-btn");
   if (tokenEl && data.JIRA_API_TOKEN) {
     tokenEl.textContent = data.JIRA_API_TOKEN.set ? data.JIRA_API_TOKEN.masked : "not set";
-    if (tokenBtn) {
-      tokenBtn.innerHTML = data.JIRA_API_TOKEN.set ? "&#x2715;" : "+";
-      tokenBtn.onclick = data.JIRA_API_TOKEN.set
-        ? () => removeSecret("JIRA_API_TOKEN", "Jira API Token")
-        : () => showSetSecret("JIRA_API_TOKEN", "Jira API Token");
-    }
   }
   // Jira base URL
   const urlEl = document.getElementById("int-jira-url");
@@ -878,13 +873,144 @@ function updateIntCredentials(data) {
   const tomEl = document.getElementById("int-tom-key");
   const tomBtn = document.getElementById("int-tom-key-btn");
   if (tomEl && data.TOMTOM_API_KEY) {
-    tomEl.textContent = data.TOMTOM_API_KEY.set ? data.TOMTOM_API_KEY.masked : "not set";
+    tomEl.textContent = data.TOMTOM_API_KEY.set ? data.TOMTOM_API_KEY.masked : "";
     if (tomBtn) {
-      tomBtn.innerHTML = data.TOMTOM_API_KEY.set ? "&#x2715;" : "+";
+      tomBtn.textContent = data.TOMTOM_API_KEY.set ? "Remove" : "Add";
+      tomBtn.className = data.TOMTOM_API_KEY.set ? "btn btn-sm danger" : "btn btn-sm";
       tomBtn.onclick = data.TOMTOM_API_KEY.set
         ? () => removeSecret("TOMTOM_API_KEY", "TomTom API Key")
         : () => showSetSecret("TOMTOM_API_KEY", "TomTom API Key");
     }
+  }
+}
+
+// --- Atlassian Modal ---
+function openAtlassianModal() {
+  const modal = document.getElementById("atlassian-modal");
+  modal.style.display = "flex";
+  // Pre-fill current values
+  const emailEl = document.getElementById("int-jira-email");
+  const urlEl = document.getElementById("int-jira-url");
+  const tokenEl = document.getElementById("int-jira-token");
+  const getText = (el) => (el && el.textContent !== "not set" && el.textContent !== "--") ? el.textContent : "";
+  document.getElementById("atl-email").value = getText(emailEl);
+  const maskedToken = getText(tokenEl);
+  const tokenInput = document.getElementById("atl-token");
+  tokenInput.value = maskedToken;
+  tokenInput.placeholder = "Atlassian API token";
+  tokenInput.dataset.existing = maskedToken ? "1" : "";
+  tokenInput.dataset.masked = maskedToken;
+  document.getElementById("atl-url").value = getText(urlEl);
+  // Reset test result
+  const result = document.getElementById("atl-test-result");
+  result.style.display = "none";
+  result.textContent = "";
+  updateAtlTestBtn();
+  setTimeout(() => document.getElementById("atl-email").focus(), 100);
+}
+
+function closeAtlassianModal() {
+  document.getElementById("atlassian-modal").style.display = "none";
+}
+
+function onAtlTokenFocus() {
+  const input = document.getElementById("atl-token");
+  if (input.dataset.masked && input.value === input.dataset.masked) {
+    input.select();
+  }
+}
+
+function onAtlTokenInput() {
+  const input = document.getElementById("atl-token");
+  if (input.dataset.masked && input.value !== input.dataset.masked) {
+    input.type = "password";
+    input.dataset.masked = "";
+  }
+  updateAtlTestBtn();
+}
+
+function updateAtlTestBtn() {
+  const email = document.getElementById("atl-email").value.trim();
+  const tokenInput = document.getElementById("atl-token");
+  const hasToken = tokenInput.value.trim() || tokenInput.dataset.existing;
+  const url = document.getElementById("atl-url").value.trim();
+  const btn = document.getElementById("atl-test-btn");
+  const allFilled = email && hasToken && url;
+  btn.disabled = !allFilled;
+  btn.style.opacity = allFilled ? "1" : "0.5";
+}
+
+async function testAtlassian() {
+  const btn = document.getElementById("atl-test-btn");
+  const result = document.getElementById("atl-test-result");
+  btn.disabled = true;
+  btn.textContent = "Testing...";
+  result.style.display = "block";
+  result.style.background = "var(--card-bg)";
+  result.style.color = "var(--text-muted)";
+  result.textContent = "Saving credentials and testing connection...";
+
+  // Save credentials first
+  const email = document.getElementById("atl-email").value.trim();
+  const tokenInput = document.getElementById("atl-token");
+  const token = tokenInput.value.trim();
+  const isNewToken = token && token !== tokenInput.dataset.masked;
+  const url = document.getElementById("atl-url").value.trim();
+  const h = { "Content-Type": "application/json" };
+  if (email) await fetch("/api/secrets/JIRA_EMAIL", { method: "POST", headers: h, body: JSON.stringify({ value: email }) });
+  if (isNewToken) await fetch("/api/secrets/JIRA_API_TOKEN", { method: "POST", headers: h, body: JSON.stringify({ value: token }) });
+  if (url) await fetch("/api/secrets/JIRA_BASE_URL", { method: "POST", headers: h, body: JSON.stringify({ value: url }) });
+
+  // Reconnect Jira in-process (no restart)
+  try {
+    const res = await fetch("/api/integrations/reconnect", { method: "POST", headers: h });
+    const d = await res.json();
+    if (d.ok) {
+      result.style.background = "rgba(34,197,94,0.15)";
+      result.style.color = "#4ade80";
+      result.textContent = "Connected — Jira: " + d.tools + " tools";
+    } else {
+      result.style.background = "rgba(239,68,68,0.15)";
+      result.style.color = "#f87171";
+      result.textContent = "Connection failed" + (d.error ? " — " + d.error : "") + ". Check your credentials.";
+    }
+  } catch (e) {
+    result.style.background = "rgba(239,68,68,0.15)";
+    result.style.color = "#f87171";
+    result.textContent = "Connection failed — " + e.message;
+  }
+
+  btn.textContent = "Test Connection";
+  updateAtlTestBtn();
+  loadCredentials();
+}
+
+async function saveAtlassian() {
+  const email = document.getElementById("atl-email").value.trim();
+  const tokenInput = document.getElementById("atl-token");
+  const token = tokenInput.value.trim();
+  const isNewToken = token && token !== tokenInput.dataset.masked;
+  const url = document.getElementById("atl-url").value.trim();
+  let saved = 0;
+  const h = { "Content-Type": "application/json" };
+  if (email) {
+    const r = await fetch("/api/secrets/JIRA_EMAIL", { method: "POST", headers: h, body: JSON.stringify({ value: email }) });
+    if ((await r.json()).ok) saved++;
+  }
+  if (isNewToken) {
+    const r = await fetch("/api/secrets/JIRA_API_TOKEN", { method: "POST", headers: h, body: JSON.stringify({ value: token }) });
+    if ((await r.json()).ok) saved++;
+  }
+  if (url) {
+    const r = await fetch("/api/secrets/JIRA_BASE_URL", { method: "POST", headers: h, body: JSON.stringify({ value: url }) });
+    if ((await r.json()).ok) saved++;
+  }
+  if (saved > 0) {
+    toast("Saved. Restart bot for changes to take effect.", true);
+    closeAtlassianModal();
+    loadCredentials();
+  } else {
+    toast("Nothing to save — fill in at least one field.", false);
   }
 }
 

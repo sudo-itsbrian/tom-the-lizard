@@ -8,17 +8,27 @@ Tom The Lizard is a Zalo chatbot with an Express dashboard. Single Node.js proce
 
 ## Architecture
 
-- `index.js` -- entry point, Zalo bot polling, command routing (/work, /home, /word, /ping, /start, catch-all chat)
-- `claude-chat.js` -- multi-turn Claude API with Jira tool use via mcp-atlassian
-- `jira-client.js` -- MCP stdio client connecting to mcp-atlassian (Jira + Confluence)
-- `bot-state.js` -- shared singleton state (messages ring buffer, config, integrations status)
-- `scheduler.js` -- cron-based task runner, persists to tasks.json
-- `script-generator.js` -- Claude API generates Node.js scripts from natural language descriptions
-- `traffic-check.js` -- scheduled traffic report (home to work)
-- `traffic-check-inline.js` -- inline traffic for /work and /home (stdout, no Zalo send)
-- `send-zalo.js` -- standalone message sender (used by scheduled scripts)
-- `dashboard/server.js` -- Express API routes + static file serving
-- `dashboard/public/` -- SPA (index.html, style.css, app.js, tom-avatar.png)
+```
+index.js            -- entry point, Zalo bot polling, command routing
+send-zalo.js        -- standalone CLI message sender (used by scheduled scripts)
+src/
+  bot-state.js      -- shared singleton state (messages ring buffer, config, integrations)
+  claude-chat.js    -- multi-turn Claude API with Jira tool use via mcp-atlassian
+  data-dir.js       -- data directory resolution (DATA_DIR env or ./data)
+  jira-client.js    -- MCP stdio client connecting to mcp-atlassian (Jira + Confluence)
+  scheduler.js      -- cron-based task runner, persists to tasks.json
+  script-generator.js -- Claude API generates Node.js scripts from natural language
+  traffic.js        -- TomTom traffic check (module + CLI with --send flag)
+dashboard/
+  server.js         -- Express API routes + static file serving
+  public/           -- SPA (index.html, style.css, app.js, tom-avatar.png)
+data/               -- runtime data (mounted volume in production)
+  .env              -- secrets (canonical location)
+  places.json       -- home, work, custom locations with coords
+  tasks.json        -- scheduled task definitions
+  word-config.json  -- vocabulary categories
+  scripts/          -- generated task scripts
+```
 
 ## Key Patterns
 
@@ -29,10 +39,13 @@ if (/^\/work/.test(text)) { handleTraffic(chatId, "work"); return; }
 ```
 
 ### Claude Chat with Tools
-`claude-chat.js` runs a loop (max 8 turns) calling Claude with Jira tools. When Claude returns `tool_use`, the tool is executed via mcp-atlassian and results fed back.
+`src/claude-chat.js` runs a loop (max 8 turns) calling Claude with Jira tools. When Claude returns `tool_use`, the tool is executed via mcp-atlassian and results fed back.
 
 ### Script Generation
-`script-generator.js` calls Claude to generate a Node.js script from a description. System prompt includes available env vars, Zalo send pattern, and places context from `places.json`. Scripts are validated with `node --check`.
+`src/script-generator.js` calls Claude to generate a Node.js script from a description. System prompt includes available env vars, Zalo send pattern, and places context from `places.json`. Scripts are validated with `node --check`.
+
+### Traffic Check
+`src/traffic.js` is both a module (`getTraffic("work"|"home")`) and a CLI (`node src/traffic.js work --send`). The `--send` flag sends the result to Zalo (used by scheduler).
 
 ### Dashboard API
 All config is read/written via REST endpoints in `dashboard/server.js`:
@@ -42,12 +55,6 @@ All config is read/written via REST endpoints in `dashboard/server.js`:
 - `GET/POST /api/word-config` -- vocabulary categories
 - `GET/POST/PUT/DELETE /api/tasks` -- scheduled tasks
 - `GET /api/events` -- SSE stream for live updates
-
-### Config Files
-- `.env` -- secrets (dotenv)
-- `places.json` -- home, work, custom locations with coords
-- `tasks.json` -- scheduled task definitions
-- `word-config.json` -- vocabulary categories
 
 ## Commands
 
@@ -65,4 +72,5 @@ node index.js      # Same as above
 - Theme toggle (light/dark) persists to localStorage
 - All Vietnamese text uses Unicode escapes in JS source for reliability
 - Places are searched via TomTom + Nominatim (OSM) fallback
-- Generated scripts saved to `scripts/task-{id}.js`
+- All runtime data lives in `data/` (or `DATA_DIR` env) -- mounted as Docker volume
+- Generated scripts saved to `data/scripts/task-{id}.js`

@@ -1,5 +1,10 @@
 FROM node:22-alpine
 
+RUN apk add --no-cache curl && \
+    curl -LsSf https://astral.sh/uv/install.sh | sh && \
+    ln -s /root/.local/bin/uv /usr/local/bin/uv && \
+    ln -s /root/.local/bin/uvx /usr/local/bin/uvx
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./

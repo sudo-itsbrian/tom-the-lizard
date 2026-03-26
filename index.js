@@ -1,18 +1,34 @@
-require("dotenv").config({ override: true });
-const { execFile } = require("child_process");
+const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./src/data-dir");
+
+// Ensure data/.env exists for fresh installs
+const envPath = dataPath(".env");
+if (!fs.existsSync(envPath)) {
+  fs.writeFileSync(envPath, [
+    "ZALO_BOT_TOKEN=",
+    "ANTHROPIC_API_KEY=",
+    "MY_CHAT_ID=",
+    "TOMTOM_API_KEY=",
+    "JIRA_API_TOKEN=",
+    "JIRA_EMAIL=",
+    ""
+  ].join("\n"));
+  console.log("[init] Created data/.env — fill in credentials via dashboard or edit directly.");
+}
+require("dotenv").config({ path: envPath, override: true });
+
 const ZaloBot = require("node-zalo-bot");
 const Anthropic = require("@anthropic-ai/sdk");
-const { dataPath } = require("./data-dir");
-const { chat, ensureJira } = require("./claude-chat");
-const { state, addMessage } = require("./bot-state");
+const { chat, ensureJira } = require("./src/claude-chat");
+const { state, addMessage } = require("./src/bot-state");
 const { startDashboard } = require("./dashboard/server");
-const { initScheduler } = require("./scheduler");
+const { initScheduler } = require("./src/scheduler");
+const { getTraffic } = require("./src/traffic");
 
 const bot = new ZaloBot(process.env.ZALO_BOT_TOKEN, {
   polling: { interval: 500, params: { timeout: 30 } },
 });
-const fs = require("fs");
 let MY_CHAT_ID = process.env.MY_CHAT_ID;
 const MAX_MSG_LEN = 2000;
 
@@ -20,7 +36,6 @@ function saveChatId(chatId) {
   MY_CHAT_ID = String(chatId);
   process.env.MY_CHAT_ID = MY_CHAT_ID;
   state.zalo.chatId = MY_CHAT_ID;
-  const envPath = dataPath(".env");
   const lines = fs.readFileSync(envPath, "utf8").split("\n");
   const idx = lines.findIndex((l) => l.startsWith("MY_CHAT_ID="));
   if (idx >= 0) lines[idx] = `MY_CHAT_ID=${MY_CHAT_ID}`;
@@ -31,7 +46,6 @@ function saveChatId(chatId) {
 
 console.log("Bot starting...");
 
-// Start dashboard and scheduler
 startDashboard(3100).catch((e) => console.error("[dashboard] Failed:", e.message));
 initScheduler();
 
@@ -63,20 +77,29 @@ function sendAndLog(chatId, text) {
 }
 
 function handleTraffic(chatId, direction) {
-  sendAndLog(chatId, "Đang kiểm tra giao thông...");
-  execFile("node", [path.join(__dirname, "traffic-check-inline.js"), direction], {
-    timeout: 15_000,
-    env: process.env,
-  }, (err, stdout) => {
-    if (err) return sendAndLog(chatId, "Lỗi: " + err.message);
-    sendAndLog(chatId, stdout.trim());
-  });
+  sendAndLog(chatId, "\u0110ang ki\u1ec3m tra giao th\u00f4ng...");
+  getTraffic(direction)
+    .then((msg) => sendAndLog(chatId, msg))
+    .catch((err) => sendAndLog(chatId, "L\u1ed7i: " + err.message));
+}
+
+// Track recent words to avoid repeats (persisted to data/word-history.json)
+const WORD_HISTORY_MAX = 50;
+function loadWordHistory() {
+  try { return JSON.parse(fs.readFileSync(dataPath("word-history.json"), "utf8")); }
+  catch { return []; }
+}
+function saveWordHistory(history) {
+  fs.writeFileSync(dataPath("word-history.json"), JSON.stringify(history));
+}
+function extractWord(text) {
+  const m = text.match(/\ud83d\udcd6\s+(\w+)/);
+  return m ? m[1].toUpperCase() : null;
 }
 
 function handleWord(chatId) {
   sendAndLog(chatId, "\u0110ang t\u00ecm t\u1eeb v\u1ef1ng...");
 
-  // Read word config
   let categories = ["Business", "Technology", "Daily Life"];
   try {
     const cfg = JSON.parse(fs.readFileSync(dataPath("word-config.json"), "utf8"));
@@ -85,27 +108,37 @@ function handleWord(chatId) {
   } catch {}
 
   const category = categories[Math.floor(Math.random() * categories.length)];
+  const history = loadWordHistory();
+  const recentWords = history.slice(-WORD_HISTORY_MAX).join(", ");
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 500,
-    system: `You are an English vocabulary tutor. Given a category, pick one interesting, uncommon but useful English word and respond in EXACTLY this format (no extra text):
+    temperature: 1,
+    system: `You are an English vocabulary tutor. Pick one interesting, uncommon but useful English word and respond in EXACTLY this format (no extra text):
 
-📖 WORD /pronunciation/
+\ud83d\udcd6 WORD /pronunciation/
 
-🇬🇧 English definition
-🇻🇳 Vietnamese meaning
+\ud83c\uddec\ud83c\udde7 English definition
+\ud83c\uddfb\ud83c\uddf3 Vietnamese meaning
 
-💡 Context: When/where to use this word
+\ud83d\udca1 Context: When/where to use this word
 
-📝 Example 1: Sample sentence
-📝 Example 2: Sample sentence
+\ud83d\udcdd Example 1: Sample sentence
+\ud83d\udcdd Example 2: Sample sentence
 
-Pick words that are B2-C1 level, practical, and memorable. Not basic words.`,
+Pick words that are B2-C1 level, practical, and memorable. Not basic words.
+You MUST pick a word that is NOT in this list of already-used words: [${recentWords}]`,
     messages: [{ role: "user", content: `Category: ${category}` }],
   }).then((response) => {
     const text = response.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+    const word = extractWord(text);
+    if (word) {
+      history.push(word);
+      if (history.length > WORD_HISTORY_MAX) history.splice(0, history.length - WORD_HISTORY_MAX);
+      saveWordHistory(history);
+    }
     sendAndLog(chatId, text);
   }).catch((err) => {
     console.error("Word error:", err.message);
@@ -114,9 +147,9 @@ Pick words that are B2-C1 level, practical, and memorable. Not basic words.`,
 }
 
 function handleChat(chatId, text) {
-  sendAndLog(chatId, "Đang xử lý...");
+  sendAndLog(chatId, "\u0110ang x\u1eed l\u00fd...");
 
-  const progressMsgs = ["Đang tìm kiếm thông tin...", "Chờ mình chút nha...", "Sắp xong rồi..."];
+  const progressMsgs = ["\u0110ang t\u00ecm ki\u1ebfm th\u00f4ng tin...", "Ch\u1edd m\u00ecnh ch\u00fat nha...", "S\u1eafp xong r\u1ed3i..."];
   let step = 0;
   const timer = setInterval(() => {
     if (step < progressMsgs.length) sendAndLog(chatId, progressMsgs[step++]);
@@ -130,7 +163,7 @@ function handleChat(chatId, text) {
     .catch((err) => {
       clearInterval(timer);
       console.error("Chat error:", err.message);
-      sendAndLog(chatId, "Lỗi: " + err.message);
+      sendAndLog(chatId, "L\u1ed7i: " + err.message);
     });
 }
 
@@ -141,7 +174,6 @@ bot.on("message", (msg) => {
 
   state.zalo.lastPoll = new Date().toISOString();
 
-  // Auto-capture chat ID on first message (onboarding)
   if (!MY_CHAT_ID) {
     saveChatId(chatId);
     const name = msg.from?.display_name || "ban";
@@ -182,20 +214,9 @@ bot.on("message", (msg) => {
     return;
   }
 
-  if (/^\/work/.test(text)) {
-    handleTraffic(chatId, "work");
-    return;
-  }
-
-  if (/^\/home/.test(text)) {
-    handleTraffic(chatId, "home");
-    return;
-  }
-
-  if (/^\/word/.test(text)) {
-    handleWord(chatId);
-    return;
-  }
+  if (/^\/work/.test(text)) { handleTraffic(chatId, "work"); return; }
+  if (/^\/home/.test(text)) { handleTraffic(chatId, "home"); return; }
+  if (/^\/word/.test(text)) { handleWord(chatId); return; }
 
   handleChat(chatId, text);
 });

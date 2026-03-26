@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "lobster",
+      "name": "tom-bot",
       "runtimeExecutable": "node",
       "runtimeArgs": ["index.js"],
       "port": 3100
