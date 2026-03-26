@@ -1,0 +1,9 @@
+node_modules
+.env
+.env.backup
+.git
+.claude
+plans
+maps-api-research-report.md
+*.log
+.DS_Store
