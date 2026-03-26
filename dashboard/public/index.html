@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tom The Lizard</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ===== ONBOARDING WIZARD ===== -->
+<div id="onboarding" class="ob-overlay" style="display:none">
+  <div class="ob-card">
+    <!-- Step dots -->
+    <div class="ob-dots">
+      <span class="ob-dot active" data-step="0"></span>
+      <span class="ob-dot" data-step="1"></span>
+      <span class="ob-dot" data-step="2"></span>
+      <span class="ob-dot" data-step="3"></span>
+    </div>
+
+    <!-- Step 0: Welcome + Zalo -->
+    <div class="ob-step active" id="ob-step-0">
+      <div class="ob-hero"><img src="/tom-avatar.png" class="ob-avatar" alt="Tom"></div>
+      <h2 class="ob-title">Welcome to Tom</h2>
+      <p class="ob-desc">Your personal Zalo assistant. Let's get you set up in a few steps.</p>
+      <div class="form-group" style="margin-top:20px">
+        <label>Zalo Bot Token</label>
+        <input type="password" id="ob-zalo" placeholder="Paste your Zalo Bot token here" autocomplete="off">
+        <div class="ob-hint">Get it from <a href="https://developers.zalo.me" target="_blank" class="ob-link">developers.zalo.me</a></div>
+      </div>
+      <div class="ob-actions">
+        <div></div>
+        <button class="btn btn-primary" onclick="obNext(0)">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 1: Anthropic -->
+    <div class="ob-step" id="ob-step-1">
+      <div class="ob-hero">&#x1F9E0;</div>
+      <h2 class="ob-title">AI Brain</h2>
+      <p class="ob-desc">Tom uses Claude to understand your messages and interact with Jira.</p>
+      <div class="form-group" style="margin-top:20px">
+        <label>Anthropic API Key</label>
+        <input type="password" id="ob-anthropic" placeholder="sk-ant-..." autocomplete="off">
+        <div class="ob-hint">Get it from <a href="https://console.anthropic.com/settings/keys" target="_blank" class="ob-link">console.anthropic.com</a></div>
+      </div>
+      <div class="ob-actions">
+        <button class="btn" onclick="obBack(1)">Back</button>
+        <button class="btn btn-primary" onclick="obNext(1)">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Home & Work -->
+    <div class="ob-step" id="ob-step-2">
+      <div class="ob-hero">&#x1F3E0;</div>
+      <h2 class="ob-title">Your Commute</h2>
+      <p class="ob-desc">Set home and work locations for daily traffic updates.</p>
+      <div style="margin-top:16px">
+        <div class="ob-place-row">
+          <span class="ob-place-icon">&#x1F3E0;</span>
+          <div class="ob-place-info">
+            <div class="ob-place-label">Home</div>
+            <div class="ob-place-name" id="ob-home-name">Not set</div>
+          </div>
+          <button class="btn btn-sm" onclick="obSearchPlace('home')">Search</button>
+        </div>
+        <div class="ob-place-row">
+          <span class="ob-place-icon">&#x1F3E2;</span>
+          <div class="ob-place-info">
+            <div class="ob-place-label">Work</div>
+            <div class="ob-place-name" id="ob-work-name">Not set</div>
+          </div>
+          <button class="btn btn-sm" onclick="obSearchPlace('work')">Search</button>
+        </div>
+      </div>
+      <div class="ob-actions">
+        <button class="btn" onclick="obBack(2)">Back</button>
+        <div>
+          <button class="btn" onclick="obSkip(2)">Skip</button>
+          <button class="btn btn-primary" onclick="obNext(2)">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Atlassian -->
+    <div class="ob-step" id="ob-step-3">
+      <div class="ob-hero">&#x1F527;</div>
+      <h2 class="ob-title">Atlassian</h2>
+      <p class="ob-desc">Connect Jira and Confluence for project queries via Zalo.</p>
+      <div style="margin-top:16px">
+        <div class="form-group">
+          <label>Jira Email</label>
+          <input type="text" id="ob-jira-email" placeholder="you@company.com">
+        </div>
+        <div class="form-group">
+          <label>API Token</label>
+          <input type="password" id="ob-jira-token" placeholder="Atlassian API token" autocomplete="off">
+          <div class="ob-hint">Get it from <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" class="ob-link">Atlassian API tokens</a></div>
+        </div>
+        <div class="form-group">
+          <label>Base URL</label>
+          <input type="text" id="ob-jira-url" placeholder="https://your-org.atlassian.net">
+        </div>
+      </div>
+      <div class="ob-actions">
+        <button class="btn" onclick="obBack(3)">Back</button>
+        <div>
+          <button class="btn" onclick="obSkip(3)">Skip</button>
+          <button class="btn btn-primary" onclick="obFinish()">Finish</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div class="ob-step" id="ob-step-done">
+      <div class="ob-hero ob-done-check"><img src="/tom-avatar.png" class="ob-avatar" alt="Tom"></div>
+      <h2 class="ob-title">Tom is ready!</h2>
+      <p class="ob-desc">Send any message to Tom on Zalo to connect. Your Chat ID will be saved automatically on the first message.</p>
+      <div class="ob-actions" style="margin-top:24px;justify-content:center">
+        <button class="btn btn-primary" onclick="obClose()" style="padding:10px 28px;font-size:14px">Open Dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<button class="hamburger" onclick="toggleSidebar()">&#9776;</button>
+<div class="overlay" onclick="toggleSidebar()"></div>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <span class="logo"><img src="/tom-avatar.png" alt="Tom" onerror="this.parentElement.textContent='&#x1F98E;'"></span>
+    <div>
+      <h1>Tom</h1>
+      <span class="subtitle">the lizard</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="#overview" data-view="overview" class="active"><span class="nav-icon">&#x25C9;</span> Overview</a>
+    <a href="#integrations" data-view="integrations"><span class="nav-icon">&#x2B21;</span> Integrations</a>
+    <a href="#scheduler" data-view="scheduler"><span class="nav-icon">&#x23F1;</span> Scheduler</a>
+    <a href="#chat" data-view="chat"><span class="nav-icon">&#x2699;</span> Chat Config</a>
+    <a href="#messages" data-view="messages"><span class="nav-icon">&#x25B7;</span> Messages</a>
+    <a href="#security" data-view="security"><span class="nav-icon">&#x2206;</span> Security</a>
+  </nav>
+  <div class="sidebar-footer">
+    <span class="theme-toggle" onclick="toggleTheme()" title="Toggle theme"><span id="theme-icon">&#x263E;</span></span>
+    tom v1.0.0
+  </div>
+</aside>
+
+<main class="main">
+
+  <!-- ===== OVERVIEW ===== -->
+  <div class="view active" id="view-overview">
+    <div class="page-header">
+      <div>
+        <h2>Overview</h2>
+        <div class="page-subtitle">real-time bot status</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="restartBot()">Restart</button>
+    </div>
+
+    <div class="metric-grid" id="metric-grid">
+      <div class="metric-card" id="mc-status">
+        <div class="metric-label">Status</div>
+        <div class="metric-value" id="mv-status">--</div>
+        <div class="metric-sub" id="ms-pid">pid --</div>
+      </div>
+      <div class="metric-card" id="mc-uptime">
+        <div class="metric-label">Uptime</div>
+        <div class="metric-value" id="mv-uptime">--</div>
+        <div class="metric-sub">since start</div>
+      </div>
+      <div class="metric-card" id="mc-zalo">
+        <div class="metric-label">Zalo</div>
+        <div class="metric-value" id="mv-zalo">--</div>
+        <div class="metric-sub" id="ms-poll">last poll --</div>
+      </div>
+      <div class="metric-card" id="mc-memory">
+        <div class="metric-label">Memory</div>
+        <div class="metric-value" id="mv-memory">--</div>
+        <div class="metric-sub">rss</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent Messages <span class="link" onclick="navigate('messages')">view all</span></div>
+      <div class="msg-list" id="recent-msgs">
+        <div class="msg-empty">No messages yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== INTEGRATIONS ===== -->
+  <div class="view" id="view-integrations">
+    <div class="page-header">
+      <div>
+        <h2>Integrations</h2>
+        <div class="page-subtitle">connected services</div>
+      </div>
+    </div>
+
+    <!-- Atlassian (Jira + Confluence) -->
+    <div class="card int-service-card">
+      <div class="int-service-header">
+        <span class="svc-badge"><span class="svc-icon svc-jira">A</span>Atlassian</span>
+        <span id="int-jira-tools" style="display:none"></span>
+        <span id="int-conf-tools" style="display:none"></span>
+        <span style="margin-left:auto"></span>
+        <button class="btn btn-sm btn-ghost" onclick="testInt('jira')">Test</button>
+        <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('atlassian')">&#x2699;</button>
+      </div>
+      <!-- Hidden status spans for JS updates -->
+      <span id="int-jira-status" style="display:none"></span>
+      <span id="int-conf-status" style="display:none"></span>
+      <div class="int-service-panel" id="panel-atlassian" style="display:none">
+        <div class="int-cred-row">
+          <label>Email</label>
+          <div class="int-cred-value">
+            <span id="int-jira-email" class="mono">--</span>
+            <button class="btn-icon" onclick="showSetSecret('JIRA_EMAIL','Jira Email')" title="Edit">&#x270E;</button>
+          </div>
+        </div>
+        <div class="int-cred-row">
+          <label>API Token</label>
+          <div class="int-cred-value">
+            <span id="int-jira-token" class="mono">--</span>
+            <button class="btn-icon" id="int-jira-token-btn" onclick="showSetSecret('JIRA_API_TOKEN','Jira API Token')" title="Set">+</button>
+          </div>
+        </div>
+        <div class="int-cred-row">
+          <label>Base URL</label>
+          <div class="int-cred-value">
+            <span id="int-jira-url" class="mono">--</span>
+            <button class="btn-icon" onclick="showSetSecret('JIRA_BASE_URL','Atlassian Base URL')" title="Edit">&#x270E;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TomTom -->
+    <div class="card int-service-card">
+      <div class="int-service-header">
+        <span class="svc-badge"><span class="svc-icon svc-tom">T</span>TomTom Traffic</span>
+        <span id="int-tom-status" style="display:none"></span>
+        <span id="int-tom-route" class="mono" style="margin-left:auto">--</span>
+        <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('tomtom')">&#x2699;</button>
+      </div>
+      <div class="int-service-panel" id="panel-tomtom" style="display:none">
+        <div class="int-cred-row">
+          <label>API Key</label>
+          <div class="int-cred-value">
+            <span id="int-tom-key" class="mono">--</span>
+            <button class="btn-icon" id="int-tom-key-btn" onclick="showSetSecret('TOMTOM_API_KEY','TomTom API Key')" title="Set">+</button>
+          </div>
+        </div>
+
+        <!-- Home -->
+        <div style="border-top:1px solid var(--border);margin:10px 0;padding-top:10px">
+          <div class="place-slot">
+            <div class="place-slot-header">
+              <span class="place-slot-icon">&#x1F3E0;</span>
+              <span class="place-slot-label">Home</span>
+              <span class="place-slot-name" id="slot-home-name">--</span>
+              <button class="btn btn-sm btn-ghost" onclick="showPlaceSearch('home')">Change</button>
+            </div>
+            <div class="place-slot-addr mono" id="slot-home-addr">--</div>
+          </div>
+        </div>
+
+        <!-- Work -->
+        <div style="border-top:1px solid var(--border);padding-top:10px">
+          <div class="place-slot">
+            <div class="place-slot-header">
+              <span class="place-slot-icon">&#x1F3E2;</span>
+              <span class="place-slot-label">Work</span>
+              <span class="place-slot-name" id="slot-work-name">--</span>
+              <button class="btn btn-sm btn-ghost" onclick="showPlaceSearch('work')">Change</button>
+            </div>
+            <div class="place-slot-addr mono" id="slot-work-addr">--</div>
+          </div>
+        </div>
+
+        <!-- Custom Places -->
+        <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <label style="margin:0">Other Places</label>
+            <button class="btn btn-sm" onclick="showPlaceSearch('custom')">+ Add</button>
+          </div>
+          <div id="custom-places-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Place Search Modal -->
+    <div id="place-search-modal" class="modal-overlay" style="display:none">
+      <div class="card modal-card" style="width:420px">
+        <div class="card-title"><span id="ps-title">Set Location</span> <span class="link" onclick="closePlaceSearch()">&#x2715;</span></div>
+        <input type="hidden" id="ps-slot">
+        <input type="hidden" id="ps-edit-idx">
+
+        <!-- Custom label (only for custom places) -->
+        <div class="form-group" id="ps-label-group" style="display:none">
+          <label>Label</label>
+          <input type="text" id="ps-label" placeholder="e.g. Gym, School, Mom's house">
+        </div>
+
+        <div class="form-group">
+          <label>Search Location</label>
+          <div class="search-input-wrap">
+            <input type="text" id="ps-query" placeholder="Type a place name..." oninput="debouncePlaceSearch()">
+            <span class="search-spinner" id="ps-spinner" style="display:none"></span>
+          </div>
+        </div>
+
+        <div id="ps-results" class="search-results"></div>
+
+        <!-- Manual coords fallback -->
+        <div id="ps-manual" style="display:none;margin-top:8px">
+          <div class="hint">Can't find it? Enter coordinates manually.</div>
+          <div class="form-group">
+            <label>Name</label>
+            <input type="text" id="ps-manual-name" placeholder="e.g. VNG Campus Z06">
+          </div>
+          <div class="form-group">
+            <label>Lat, Lng</label>
+            <input type="text" id="ps-manual-coords" placeholder="10.7416, 106.7220">
+          </div>
+        </div>
+
+        <div id="ps-selected" class="search-selected" style="display:none">
+          <div class="search-selected-name" id="ps-sel-name"></div>
+          <div class="search-selected-addr mono" id="ps-sel-addr"></div>
+          <div class="search-selected-coords mono" id="ps-sel-coords"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" onclick="closePlaceSearch()">Cancel</button>
+          <button class="btn btn-primary" id="ps-save-btn" onclick="confirmPlaceSearch()" disabled>Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vocabulary -->
+    <div class="card int-service-card">
+      <div class="int-service-header">
+        <span class="svc-badge"><span class="svc-icon" style="background:#8b5cf6">W</span>Vocabulary</span>
+        <span class="mono" style="margin-left:auto">/word</span>
+        <button class="btn btn-sm btn-ghost" onclick="toggleServicePanel('vocab')">&#x2699;</button>
+      </div>
+      <div class="int-service-panel" id="panel-vocab" style="display:none">
+        <label style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);font-family:var(--font-mono);font-weight:500;margin-bottom:6px;display:block">Categories</label>
+        <div id="vocab-categories" class="vocab-chips"></div>
+        <div style="margin-top:8px;display:flex;gap:6px">
+          <input type="text" id="vocab-new-cat" placeholder="New category..." style="flex:1;padding:4px 8px;font-size:11px">
+          <button class="btn btn-sm" onclick="addVocabCategory()">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SCHEDULER ===== -->
+  <div class="view" id="view-scheduler">
+    <div class="page-header">
+      <div>
+        <h2>Scheduler</h2>
+        <div class="page-subtitle">automated tasks</div>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="showAddTask()">+ New Task</button>
+    </div>
+
+    <!-- Task List -->
+    <div id="task-list"></div>
+    <div class="hint" style="margin-top:8px">Tasks persist and survive bot restarts.</div>
+
+    <!-- Task Modal -->
+    <div id="task-modal" class="modal-overlay" style="display:none">
+      <div class="card modal-card" style="width:460px">
+        <div class="card-title"><span id="task-modal-title">New Task</span> <span class="link" onclick="closeTaskModal()">&#x2715;</span></div>
+        <input type="hidden" id="task-edit-id">
+
+        <!-- Description (primary input) -->
+        <div class="form-group">
+          <label>What should this task do?</label>
+          <textarea id="task-description" rows="3" placeholder="e.g. Check traffic from Scenic Valley to VNG Z06 and send me the result on Zalo"></textarea>
+        </div>
+
+        <!-- Name -->
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" id="task-name" placeholder="Auto-generated from description">
+        </div>
+
+        <!-- Time -->
+        <div class="form-group">
+          <label>Time</label>
+          <div class="time-picker">
+            <select id="task-hour"></select>
+            <span class="time-sep">:</span>
+            <select id="task-minute"></select>
+          </div>
+        </div>
+
+        <!-- Recurrence -->
+        <div class="form-group">
+          <label>Repeat</label>
+          <div class="recurrence-pills" id="recurrence-pills">
+            <button class="rec-pill" data-rec="daily" onclick="setRecurrence('daily')">Every Day</button>
+            <button class="rec-pill active" data-rec="weekdays" onclick="setRecurrence('weekdays')">Weekdays</button>
+            <button class="rec-pill" data-rec="weekly" onclick="setRecurrence('weekly')">Weekly</button>
+            <button class="rec-pill" data-rec="monthly" onclick="setRecurrence('monthly')">Monthly</button>
+            <button class="rec-pill" data-rec="once" onclick="setRecurrence('once')">Once</button>
+          </div>
+        </div>
+
+        <!-- Day picker for weekly -->
+        <div class="form-group" id="day-picker-group" style="display:none">
+          <label>Days</label>
+          <div class="day-picker">
+            <button class="day-btn" data-day="1" onclick="toggleDay(this)">Mon</button>
+            <button class="day-btn" data-day="2" onclick="toggleDay(this)">Tue</button>
+            <button class="day-btn" data-day="3" onclick="toggleDay(this)">Wed</button>
+            <button class="day-btn" data-day="4" onclick="toggleDay(this)">Thu</button>
+            <button class="day-btn" data-day="5" onclick="toggleDay(this)">Fri</button>
+            <button class="day-btn" data-day="6" onclick="toggleDay(this)">Sat</button>
+            <button class="day-btn" data-day="0" onclick="toggleDay(this)">Sun</button>
+          </div>
+        </div>
+
+        <!-- Monthly day picker -->
+        <div class="form-group" id="monthly-picker-group" style="display:none">
+          <label>Day of Month</label>
+          <select id="task-monthday"></select>
+        </div>
+
+        <!-- Once date picker -->
+        <div class="form-group" id="once-date-group" style="display:none">
+          <label>Date</label>
+          <input type="date" id="task-date">
+        </div>
+
+        <!-- Status message -->
+        <div id="task-status" class="hint" style="display:none"></div>
+
+        <!-- Toggle + Actions -->
+        <div style="display:flex;align-items:center;gap:10px;margin:14px 0 0">
+          <label style="margin:0;font-size:11px;color:var(--text-secondary)">Enabled</label>
+          <span id="task-enabled-toggle" class="toggle on" onclick="this.classList.toggle('on')"></span>
+          <div style="flex:1"></div>
+          <button class="btn btn-danger btn-sm" id="task-delete-btn" style="display:none" onclick="deleteTaskUI()">Delete</button>
+          <button class="btn" onclick="closeTaskModal()">Cancel</button>
+          <button class="btn btn-primary" id="task-save-btn" onclick="saveTask()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CHAT CONFIG ===== -->
+  <div class="view" id="view-chat">
+    <div class="page-header">
+      <div>
+        <h2>Chat Config</h2>
+        <div class="page-subtitle">claude ai settings</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Model</div>
+      <div class="form-group">
+        <label>Claude Model</label>
+        <select id="cfg-model">
+          <option value="claude-sonnet-4-20250514">claude-sonnet-4</option>
+          <option value="claude-opus-4-20250514">claude-opus-4</option>
+          <option value="claude-haiku-4-5-20251001">claude-haiku-4.5</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Max Tokens</label>
+        <input type="number" id="cfg-tokens" value="2048">
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">System Prompt <span class="link" onclick="resetPrompt()">reset</span></div>
+      <div class="form-group">
+        <textarea id="cfg-prompt" rows="5" placeholder="e.g. Ban la Lobster, tro ly ca nhan. Tra loi bang tieng Viet, ngan gon, thuc te..."></textarea>
+        <small class="mono" id="prompt-counter">0 / 2000</small>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Limits</div>
+      <div class="form-group">
+        <label>Max Message Length</label>
+        <input type="number" id="cfg-maxlen" value="2000">
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:10px">
+        <label style="margin:0">Progress Messages</label>
+        <span id="progress-toggle" class="toggle on" onclick="toggleProgress()"></span>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="saveConfig()" style="margin-top:4px">Save Changes</button>
+  </div>
+
+  <!-- ===== MESSAGES ===== -->
+  <div class="view" id="view-messages">
+    <div class="page-header">
+      <div>
+        <h2>Messages</h2>
+        <div class="page-subtitle">conversation log</div>
+      </div>
+      <select id="msg-filter" onchange="filterMessages()" style="width:auto;padding:4px 8px;font-size:11px">
+        <option value="all">All</option>
+        <option value="in">Incoming</option>
+        <option value="out">Outgoing</option>
+      </select>
+    </div>
+    <div class="card">
+      <div class="msg-list" id="all-msgs" style="max-height:540px">
+        <div class="msg-empty">No messages yet</div>
+      </div>
+      <div style="text-align:center;padding:10px">
+        <button class="btn btn-sm btn-ghost" onclick="loadMoreMessages()">Load More</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== SECURITY ===== -->
+  <div class="view" id="view-security">
+    <div class="page-header">
+      <div>
+        <h2>Security</h2>
+        <div class="page-subtitle">credentials &amp; access</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Credentials <span class="badge badge-warn">write-only</span></div>
+      <div class="hint">Once saved, tokens cannot be viewed -- only removed and re-added.</div>
+      <div id="cred-list"></div>
+    </div>
+
+    <!-- Set Secret Modal -->
+    <div id="secret-modal" class="modal-overlay" style="display:none">
+      <div class="card modal-card">
+        <div class="card-title"><span id="secret-modal-title">Set Token</span> <span class="link" onclick="closeSecretModal()">&#x2715;</span></div>
+        <input type="hidden" id="secret-key">
+        <div class="form-group">
+          <label id="secret-label">Value</label>
+          <input type="password" id="secret-value" placeholder="Paste token here..." autocomplete="off">
+        </div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeSecretModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveSecret()">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

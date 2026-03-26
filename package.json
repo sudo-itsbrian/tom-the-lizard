@@ -1,0 +1,22 @@
+{
+  "name": "tom-the-lizard",
+  "version": "1.0.0",
+  "description": "AI-powered Zalo assistant with Jira integration, traffic updates, and vocabulary builder",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": ["zalo", "bot", "ai", "jira", "claude", "assistant"],
+  "author": "Brian Dung",
+  "license": "MIT",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "cron": "^4.4.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "node-fetch": "^2.7.0",
+    "node-zalo-bot": "^0.1.6"
+  }
+}

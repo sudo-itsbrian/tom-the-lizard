@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.backup
+*.log
+.DS_Store
+plans/
+maps-api-research-report.md
+scripts/
+places.json
+tasks.json
+word-config.json
