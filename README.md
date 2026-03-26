@@ -18,14 +18,16 @@ AI-powered personal assistant on Zalo with Jira/Confluence integration, live tra
 tom-the-lizard/
 |
 |-- index.js                  # Bot entry point (Zalo polling, command routing)
-|-- claude-chat.js            # Claude API + Jira MCP tool-use loop
-|-- jira-client.js            # mcp-atlassian stdio client (Jira + Confluence)
-|-- bot-state.js              # Shared state singleton (messages, config, status)
-|-- scheduler.js              # Cron-based task runner (persists to tasks.json)
-|-- script-generator.js       # AI script generation from natural language
-|-- traffic-check.js          # Scheduled traffic report (reads places.json)
-|-- traffic-check-inline.js   # Inline traffic for /work and /home commands
-|-- send-zalo.js              # Standalone Zalo message sender
+|-- send-zalo.js              # Standalone Zalo message sender (CLI)
+|
+|-- src/
+|   |-- bot-state.js          # Shared state singleton (messages, config, status)
+|   |-- claude-chat.js        # Claude API + Jira MCP tool-use loop
+|   |-- data-dir.js           # Data directory resolution (DATA_DIR env or ./data)
+|   |-- jira-client.js        # mcp-atlassian stdio client (Jira + Confluence)
+|   |-- scheduler.js          # Cron-based task runner (persists to tasks.json)
+|   |-- script-generator.js   # AI script generation with dry-run validation
+|   |-- traffic.js            # TomTom traffic check (module + CLI with --send)
 |
 |-- dashboard/
 |   |-- server.js             # Express API (status, config, secrets, places, geocode)
@@ -35,10 +37,13 @@ tom-the-lizard/
 |       |-- app.js            # Client-side logic (navigation, forms, SSE)
 |       |-- tom-avatar.png    # Bot avatar
 |
-|-- scripts/                  # AI-generated task scripts
-|-- places.json               # Home, work, and custom locations
-|-- tasks.json                # Scheduled task definitions
-|-- word-config.json           # Vocabulary category settings
+|-- data/                     # Runtime data (mounted volume in Docker)
+|   |-- .env                  # Secrets (canonical location)
+|   |-- places.json           # Home, work, and custom locations
+|   |-- tasks.json            # Scheduled task definitions
+|   |-- word-config.json      # Vocabulary category settings
+|   |-- word-history.json     # Recent /word history (avoids repeats)
+|   |-- scripts/              # AI-generated task scripts
 ```
 
 ## How It Works
@@ -78,13 +83,16 @@ Users describe tasks in plain English. Claude generates a Node.js script that:
 3. Sends results via Zalo
 4. Exits with proper status codes
 
-Scripts are validated with `node --check` before saving.
+Scripts are validated before saving:
+1. Syntax check (`node --check`)
+2. Dry-run execution (Zalo sends disabled, real API keys passed to catch 404s, bad endpoints, etc.)
+3. If either fails, the error is fed back to Claude for automatic retry (up to 2 retries)
 
 ## Quick Start
 
 ```bash
 # Clone
-git clone https://github.com/AceDungg/tom-the-lizard.git
+git clone https://github.com/sudo-itsbrian/tom-the-lizard.git
 cd tom-the-lizard
 
 # Install dependencies

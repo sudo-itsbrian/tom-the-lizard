@@ -42,7 +42,10 @@ if (/^\/work/.test(text)) { handleTraffic(chatId, "work"); return; }
 `src/claude-chat.js` runs a loop (max 8 turns) calling Claude with Jira tools. When Claude returns `tool_use`, the tool is executed via mcp-atlassian and results fed back.
 
 ### Script Generation
-`src/script-generator.js` calls Claude to generate a Node.js script from a description. System prompt includes available env vars, Zalo send pattern, and places context from `places.json`. Scripts are validated with `node --check`.
+`src/script-generator.js` calls Claude to generate a Node.js script from a description. System prompt includes available env vars, Zalo send pattern, and places context from `places.json`. Scripts are validated in two stages:
+1. Syntax check (`node --check`)
+2. Dry-run execution (Zalo sends disabled, real API keys passed)
+If either fails, the error is fed back to Claude for a retry (up to 2 retries).
 
 ### Traffic Check
 `src/traffic.js` is both a module (`getTraffic("work"|"home")`) and a CLI (`node src/traffic.js work --send`). The `--send` flag sends the result to Zalo (used by scheduler).
@@ -74,3 +77,7 @@ node index.js      # Same as above
 - Places are searched via TomTom + Nominatim (OSM) fallback
 - All runtime data lives in `data/` (or `DATA_DIR` env) -- mounted as Docker volume
 - Generated scripts saved to `data/scripts/task-{id}.js`
+- /word tracks history in `data/word-history.json` to avoid repeats (max 50)
+- node-zalo-bot only supports text, photo, sticker -- no voice messages
+- Dashboard Atlassian modal: gear icon opens 3-field modal (email, token, base URL) with test connection
+- Secrets API rejects masked values and strips stray `*` prefixes
