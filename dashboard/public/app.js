@@ -880,11 +880,20 @@ function updateIntCredentials(data) {
   if (tomEl && data.TOMTOM_API_KEY) {
     tomEl.textContent = data.TOMTOM_API_KEY.set ? data.TOMTOM_API_KEY.masked : "";
     if (tomBtn) {
-      tomBtn.textContent = data.TOMTOM_API_KEY.set ? "Remove" : "Add";
-      tomBtn.className = data.TOMTOM_API_KEY.set ? "btn btn-sm danger" : "btn btn-sm";
-      tomBtn.onclick = data.TOMTOM_API_KEY.set
-        ? () => removeSecret("TOMTOM_API_KEY", "TomTom API Key")
-        : () => showSetSecret("TOMTOM_API_KEY", "TomTom API Key");
+      if (data.TOMTOM_API_KEY.locked) {
+        tomBtn.textContent = "\u{1f512}";
+        tomBtn.className = "btn btn-sm";
+        tomBtn.onclick = null;
+        tomBtn.disabled = true;
+        tomBtn.title = "Set via Dokploy env vars";
+      } else {
+        tomBtn.disabled = false;
+        tomBtn.textContent = data.TOMTOM_API_KEY.set ? "Remove" : "Add";
+        tomBtn.className = data.TOMTOM_API_KEY.set ? "btn btn-sm danger" : "btn btn-sm";
+        tomBtn.onclick = data.TOMTOM_API_KEY.set
+          ? () => removeSecret("TOMTOM_API_KEY", "TomTom API Key")
+          : () => showSetSecret("TOMTOM_API_KEY", "TomTom API Key");
+      }
     }
   }
 }
@@ -911,6 +920,14 @@ function openAtlassianModal() {
   result.style.display = "none";
   result.textContent = "";
   updateAtlTestBtn();
+  // In production, lock the token field (must be set via Dokploy)
+  fetch("/api/mode").then(r => r.json()).then(m => {
+    if (m.production) {
+      tokenInput.disabled = true;
+      tokenInput.placeholder = "Set via Dokploy env vars";
+      tokenInput.title = "JIRA_API_TOKEN is locked in production";
+    }
+  }).catch(() => {});
   setTimeout(() => document.getElementById("atl-email").focus(), 100);
 }
 
