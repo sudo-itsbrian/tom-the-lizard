@@ -119,7 +119,9 @@ app.post("/api/secrets/:key", (req, res) => {
   if (/^\*{2,}/.test(cleaned)) {
     return res.status(400).json({ error: "Cannot save masked value" });
   }
-  writeEnv({ [key]: cleaned });
+  const updates = { [key]: cleaned };
+  if (key === "ZALO_BOT_TOKEN") updates.MY_CHAT_ID = "";
+  writeEnv(updates);
   res.json({ ok: true, masked: SECRET_KEYS.includes(key) ? maskSecret(cleaned) : cleaned });
 });
 
