@@ -13,6 +13,7 @@ const SYSTEM = [
   "Tra loi bang tieng Viet. Ngan gon, thuc te, dung chat style.",
   "Khi can truy van Jira, dung cac tool co san.",
   "Gioi han tra loi duoi 1800 ky tu vi day la Zalo chat.",
+  "Neu nguoi dung tiep tuc hoi ve cung chu de, su dung context tu cuoc hoi thoai truoc do.",
 ].join(" ");
 
 const MAX_TURNS = 8;
@@ -38,15 +39,18 @@ function buildTools() {
   }));
 }
 
-async function chat(userMessage) {
+// Chat with optional conversation history.
+// history: array of prior { role, content } messages (from chat-history.js)
+async function chat(userMessage, history = []) {
   await ensureJira();
 
   const tools = buildTools();
-  const messages = [{ role: "user", content: userMessage }];
+  // Build messages: prior history + current user message
+  const messages = [...history, { role: "user", content: userMessage }];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const params = {
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
       system: SYSTEM,
       messages,

@@ -24,8 +24,22 @@ RULES:
 - Always call process.exit(0) on success, process.exit(1) on error
 - Keep scripts under 80 lines
 - Use Vietnamese for user-facing messages sent via Zalo
-- CRITICAL: Only use APIs you are CERTAIN exist and are publicly accessible. Do NOT guess API URLs.
-  If unsure about an API, use web scraping with fetch() + regex/string parsing on a well-known public page instead.
+
+DATA FETCHING STRATEGY (IMPORTANT):
+- For traffic data, use TomTom API (it's reliable and we have a key).
+- For Jira data, use the Jira REST API with process.env.JIRA_* credentials.
+- For real-time financial data (gold prices, oil prices, exchange rates, stock prices):
+  Use free public APIs that don't require API keys:
+  * Exchange rates: https://open.er-api.com/v6/latest/USD (free, no key needed)
+  * Gold/Silver spot price: https://api.metals.live/v1/spot (free, no key needed, returns array of {gold, silver, ...})
+  * General financial summary: use ask-claude as a LAST RESORT only, and ALWAYS add a disclaimer
+    that the data is from AI training knowledge and may not reflect current market prices.
+- For general knowledge questions (not requiring real-time data), use ask-claude:
+  const ask = require("../src/ask-claude");
+  const answer = await ask("question");
+- ONLY use direct fetch() for APIs you are 100% CERTAIN exist (TomTom, Jira, free public APIs above).
+- NEVER guess API URLs or try to scrape sites that might block server requests.
+- NEVER present AI-generated financial figures as real-time market data without a disclaimer.
 
 PLACES (CRITICAL -- NEVER hardcode coordinates):
 - When user mentions "home", "work", or any named place, ALWAYS read from places.json:
@@ -65,7 +79,7 @@ function cleanCode(raw) {
 
 function syntaxCheck(filepath) {
   return new Promise((resolve, reject) => {
-    execFile("node", ["--check", filepath], { timeout: 5000 }, (err) => {
+    execFile(process.execPath, ["--check", filepath], { timeout: 5000 }, (err) => {
       if (err) reject(new Error("Syntax error: " + err.message));
       else resolve();
     });
@@ -82,7 +96,7 @@ function dryRun(filepath) {
       ZALO_BOT_TOKEN: "",
       MY_CHAT_ID: "",
     };
-    execFile("node", [filepath], { timeout: 15000, env }, (err, stdout, stderr) => {
+    execFile(process.execPath, [filepath], { timeout: 15000, env }, (err, stdout, stderr) => {
       // Exit code 0 = success, anything else = failure
       if (err) {
         // Extract the useful error message from stderr or err
@@ -106,7 +120,7 @@ async function generateTaskScript(taskId, description) {
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 2048,
       system: SYSTEM_PROMPT + placesCtx,
       messages,

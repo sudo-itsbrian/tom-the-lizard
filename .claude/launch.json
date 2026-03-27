@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "tom-bot",
-      "runtimeExecutable": "node",
+      "runtimeExecutable": "/usr/local/bin/node",
       "runtimeArgs": ["index.js"],
       "port": 3100
     }

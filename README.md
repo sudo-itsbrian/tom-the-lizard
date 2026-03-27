@@ -89,6 +89,8 @@ Scripts are validated before saving:
 2. Dry-run execution (Zalo sends disabled, real API keys passed to catch 404s, bad endpoints, etc.)
 3. If either fails, the error is fed back to Claude for automatic retry (up to 2 retries)
 
+> **Note on AI-generated data**: The `ask-claude` helper (used in generated scripts) calls the Claude API for general knowledge queries. It does **not** have real-time data — financial figures like gold prices, exchange rates, and oil prices reflect Claude's training knowledge cutoff and may be outdated. For accurate real-time financial data, generated scripts use free public APIs (e.g., `metals.live`, `open.er-api.com`) where available.
+
 ## Quick Start
 
 ```bash

@@ -31,6 +31,7 @@ const { state, addMessage } = require("./src/bot-state");
 const { startDashboard } = require("./dashboard/server");
 const { initScheduler } = require("./src/scheduler");
 const { getTraffic } = require("./src/traffic");
+const { getHistory, addExchange, clearHistory } = require("./src/chat-history");
 
 const bot = new ZaloBot(process.env.ZALO_BOT_TOKEN, {
   polling: { interval: 500, params: { timeout: 30 } },
@@ -129,7 +130,7 @@ function handleWord(chatId) {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     max_tokens: 500,
     temperature: 1,
     system: `You are an English vocabulary tutor. Pick one interesting, uncommon but useful English word and respond in EXACTLY this format (no extra text):
@@ -171,9 +172,11 @@ function handleChat(chatId, text) {
     if (step < progressMsgs.length) sendAndLog(chatId, progressMsgs[step++]);
   }, 8_000);
 
-  chat(text)
+  const history = getHistory(chatId);
+  chat(text, history)
     .then((response) => {
       clearInterval(timer);
+      addExchange(chatId, text, response);
       sendAndLog(chatId, truncate(response));
     })
     .catch((err) => {
@@ -210,6 +213,7 @@ bot.on("message", (msg) => {
   addMessage("in", text, msg.from?.display_name || "Brian");
 
   if (/^\/start/.test(text)) {
+    clearHistory(chatId); // reset conversation context
     const name = msg.from?.display_name || "Brian";
     sendAndLog(chatId, [
       `Ch\u00e0o ${name}! Tom s\u1eb5n s\u00e0ng \ud83e\udd8e`,
