@@ -213,25 +213,30 @@ async function loadCredentials() {
 function renderCredentials(data) {
   const list = document.getElementById("cred-list");
   if (!list) return;
-  const header = "";
   const rows = Object.entries(CRED_META).map(([key, meta]) => {
     const info = data[key] || { set: false };
     const isSet = info.set;
     const masked = info.value || info.masked || "";
+    const locked = info.locked || false;
+    let actionHtml;
+    if (locked) {
+      // Production: secrets locked, show lock icon
+      actionHtml = `<span class="cred-locked" title="Set via Dokploy env vars">&#x1f512;</span>`;
+    } else if (isSet) {
+      actionHtml = `<button class="btn-icon danger" onclick="removeSecret('${key}','${meta.label}')" title="Remove">&#x2715;</button>`;
+    } else {
+      actionHtml = `<button class="btn-icon success" onclick="showSetSecret('${key}','${meta.label}')" title="Set">+</button>`;
+    }
     return `<div class="cred-row">
       <div class="cred-row-dot"><span class="dot ${isSet ? "green" : "gray"}"></span></div>
       <div class="cred-row-info">
         <div class="cred-row-label">${meta.label}</div>
       </div>
       <div class="cred-row-value">${isSet ? masked : '--'}</div>
-      <div class="cred-row-action">
-        ${isSet
-          ? `<button class="btn-icon danger" onclick="removeSecret('${key}','${meta.label}')" title="Remove">&#x2715;</button>`
-          : `<button class="btn-icon success" onclick="showSetSecret('${key}','${meta.label}')" title="Set">+</button>`}
-      </div>
+      <div class="cred-row-action">${actionHtml}</div>
     </div>`;
   }).join("");
-  list.innerHTML = header + rows;
+  list.innerHTML = rows;
 }
 
 function showSetSecret(key, label) {

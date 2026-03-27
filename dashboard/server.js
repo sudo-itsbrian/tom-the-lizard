@@ -6,6 +6,7 @@ const { getTasks, addTask, updateTask, deleteTask, runTaskNow } = require("../sr
 const { generateTaskScript } = require("../src/script-generator");
 const { dataPath } = require("../src/data-dir");
 const jiraClient = require("../src/jira-client");
+const configStore = require("../src/config-store");
 
 const app = express();
 app.use(express.json());
@@ -13,12 +14,8 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const ENV_PATH = dataPath(".env");
 
-function maskSecret(val) {
-  if (!val || val.length < 8) return val ? "****" : "";
-  return "****" + val.slice(-4);
-}
-
 function readEnv() {
+  if (configStore.IS_PRODUCTION) return {}; // production: no .env file
   try {
     const raw = fs.readFileSync(ENV_PATH, "utf8");
     const env = {};
@@ -31,6 +28,7 @@ function readEnv() {
 }
 
 function writeEnv(updates) {
+  if (configStore.IS_PRODUCTION) return; // production: no .env writes
   const lines = fs.readFileSync(ENV_PATH, "utf8").split("\n");
   for (const [key, val] of Object.entries(updates)) {
     const idx = lines.findIndex((l) => l.startsWith(key + "="));
@@ -41,25 +39,31 @@ function writeEnv(updates) {
   fs.writeFileSync(ENV_PATH, lines.join("\n"));
 }
 
+// --- Mode info ---
+app.get("/api/mode", (req, res) => {
+  res.json({ production: configStore.IS_PRODUCTION });
+});
+
 // --- Onboarding ---
 app.get("/api/onboarding-status", (req, res) => {
-  const env = readEnv();
+  const hasZalo = !!process.env.ZALO_BOT_TOKEN;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
   res.json({
-    needsOnboarding: !env.ZALO_BOT_TOKEN || !env.ANTHROPIC_API_KEY,
-    hasZalo: !!env.ZALO_BOT_TOKEN,
-    hasAnthropic: !!env.ANTHROPIC_API_KEY,
-    hasJira: !!env.JIRA_API_TOKEN,
-    hasPlaces: fs.existsSync(path.join(__dirname, "..", "places.json")),
+    production: configStore.IS_PRODUCTION,
+    needsOnboarding: !configStore.IS_PRODUCTION && (!hasZalo || !hasAnthropic),
+    hasZalo,
+    hasAnthropic,
+    hasJira: !!process.env.JIRA_API_TOKEN,
+    hasPlaces: fs.existsSync(dataPath("places.json")),
   });
 });
 
-// Ensure .env exists for fresh installs
-if (!fs.existsSync(ENV_PATH)) {
-  fs.writeFileSync(ENV_PATH, "# Tom The Lizard config\n");
+if (!configStore.IS_PRODUCTION) {
+  // Local mode: ensure .env exists
+  if (!fs.existsSync(ENV_PATH)) {
+    fs.writeFileSync(ENV_PATH, "# Tom The Lizard config\n");
+  }
 }
-
-// Also load .env from data dir on startup (for container deployments)
-require("dotenv").config({ path: ENV_PATH, override: false });
 
 // --- API Routes ---
 
@@ -74,34 +78,36 @@ app.get("/api/messages", (req, res) => {
 });
 
 app.get("/api/config", (req, res) => {
-  const env = readEnv();
   res.json({
     ...getConfig(),
     env: {
-      ZALO_BOT_TOKEN: maskSecret(env.ZALO_BOT_TOKEN),
-      MY_CHAT_ID: maskSecret(env.MY_CHAT_ID),
-      ANTHROPIC_API_KEY: maskSecret(env.ANTHROPIC_API_KEY),
-      TOMTOM_API_KEY: maskSecret(env.TOMTOM_API_KEY),
-      JIRA_EMAIL: env.JIRA_EMAIL || "",
-      JIRA_API_TOKEN: maskSecret(env.JIRA_API_TOKEN),
-      JIRA_URL: "https://vnggames.atlassian.net",
-      CONFLUENCE_URL: "https://vnggames.atlassian.net/wiki",
+      ZALO_BOT_TOKEN: configStore.maskSecret(process.env.ZALO_BOT_TOKEN),
+      MY_CHAT_ID: configStore.maskSecret(process.env.MY_CHAT_ID),
+      ANTHROPIC_API_KEY: configStore.maskSecret(process.env.ANTHROPIC_API_KEY),
+      TOMTOM_API_KEY: configStore.maskSecret(process.env.TOMTOM_API_KEY),
+      JIRA_EMAIL: process.env.JIRA_EMAIL || "",
+      JIRA_API_TOKEN: configStore.maskSecret(process.env.JIRA_API_TOKEN),
+      JIRA_BASE_URL: process.env.JIRA_BASE_URL || "",
     },
   });
 });
 
 // --- Secrets API (write-only tokens) ---
-const SECRET_KEYS = ["ZALO_BOT_TOKEN", "MY_CHAT_ID", "ANTHROPIC_API_KEY", "TOMTOM_API_KEY", "JIRA_API_TOKEN"];
-const PLAIN_KEYS = ["JIRA_EMAIL", "JIRA_BASE_URL"];
-
 app.get("/api/secrets", (req, res) => {
-  const env = readEnv();
   const secrets = {};
-  for (const k of SECRET_KEYS) {
-    secrets[k] = { set: !!env[k], masked: maskSecret(env[k]) };
+  for (const k of configStore.SECRET_KEYS) {
+    secrets[k] = {
+      set: !!process.env[k],
+      masked: configStore.maskSecret(process.env[k]),
+      locked: configStore.IS_PRODUCTION, // UI hides edit/delete when locked
+    };
   }
-  for (const k of PLAIN_KEYS) {
-    secrets[k] = { set: !!env[k], value: env[k] || "" };
+  for (const k of configStore.EDITABLE_KEYS) {
+    secrets[k] = {
+      set: !!process.env[k],
+      value: process.env[k] || "",
+      locked: false, // always editable
+    };
   }
   res.json(secrets);
 });
@@ -109,7 +115,8 @@ app.get("/api/secrets", (req, res) => {
 app.post("/api/secrets/:key", (req, res) => {
   const { key } = req.params;
   const { value } = req.body;
-  if (![...SECRET_KEYS, ...PLAIN_KEYS].includes(key)) {
+  const allKeys = [...configStore.SECRET_KEYS, ...configStore.EDITABLE_KEYS];
+  if (!allKeys.includes(key)) {
     return res.status(400).json({ error: "Unknown key" });
   }
   const cleaned = (value || "").trim().replace(/^\*[\s*]*/, "");
@@ -119,20 +126,53 @@ app.post("/api/secrets/:key", (req, res) => {
   if (/^\*{2,}/.test(cleaned)) {
     return res.status(400).json({ error: "Cannot save masked value" });
   }
+
+  // Production: block secret writes, allow editable keys via config.json
+  if (configStore.IS_PRODUCTION && configStore.SECRET_KEYS.includes(key)) {
+    return res.status(403).json({ error: "Secrets must be set via Dokploy environment variables" });
+  }
+
+  if (configStore.IS_PRODUCTION) {
+    // Editable key: write to config.json
+    configStore.writeConfig({ [key]: cleaned });
+    if (key === "MY_CHAT_ID") {
+      state.zalo.chatId = cleaned;
+    }
+    return res.json({ ok: true, value: cleaned });
+  }
+
+  // Local mode: write to .env file
   const updates = { [key]: cleaned };
   if (key === "ZALO_BOT_TOKEN") updates.MY_CHAT_ID = "";
   writeEnv(updates);
-  res.json({ ok: true, masked: SECRET_KEYS.includes(key) ? maskSecret(cleaned) : cleaned });
+  res.json({
+    ok: true,
+    masked: configStore.SECRET_KEYS.includes(key) ? configStore.maskSecret(cleaned) : cleaned,
+  });
 });
 
 app.delete("/api/secrets/:key", (req, res) => {
   const { key } = req.params;
-  if (![...SECRET_KEYS, ...PLAIN_KEYS].includes(key)) {
+  const allKeys = [...configStore.SECRET_KEYS, ...configStore.EDITABLE_KEYS];
+  if (!allKeys.includes(key)) {
     return res.status(400).json({ error: "Unknown key" });
   }
-  const lines = fs.readFileSync(ENV_PATH, "utf8").split("\n");
-  const filtered = lines.filter((l) => !l.startsWith(key + "="));
-  fs.writeFileSync(ENV_PATH, filtered.join("\n"));
+
+  if (configStore.IS_PRODUCTION && configStore.SECRET_KEYS.includes(key)) {
+    return res.status(403).json({ error: "Secrets must be removed via Dokploy environment variables" });
+  }
+
+  if (configStore.IS_PRODUCTION) {
+    configStore.remove(key);
+    return res.json({ ok: true });
+  }
+
+  // Local mode: remove from .env
+  try {
+    const lines = fs.readFileSync(ENV_PATH, "utf8").split("\n");
+    const filtered = lines.filter((l) => !l.startsWith(key + "="));
+    fs.writeFileSync(ENV_PATH, filtered.join("\n"));
+  } catch {}
   delete process.env[key];
   res.json({ ok: true });
 });
@@ -154,6 +194,15 @@ app.post("/api/config", (req, res) => {
 });
 
 app.post("/api/env", (req, res) => {
+  if (configStore.IS_PRODUCTION) {
+    // In production, only allow editable keys via config.json
+    const allowed = {};
+    for (const [k, v] of Object.entries(req.body)) {
+      if (configStore.EDITABLE_KEYS.includes(k)) allowed[k] = v;
+    }
+    if (Object.keys(allowed).length > 0) configStore.writeConfig(allowed);
+    return res.json({ ok: true });
+  }
   try {
     writeEnv(req.body);
     res.json({ ok: true, note: "Restart bot for some changes to take effect" });

@@ -2,7 +2,10 @@
 const Anthropic = require("@anthropic-ai/sdk");
 const jira = require("./jira-client");
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Lazy client -- always uses current process.env.ANTHROPIC_API_KEY
+function getClient() {
+  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+}
 
 const SYSTEM = [
   "Ban la Tom The Lizard, tro ly ca nhan cua Brian, PM tai VNG Games.",
@@ -50,7 +53,7 @@ async function chat(userMessage) {
     };
     if (tools.length > 0) params.tools = tools;
 
-    const response = await anthropic.messages.create(params);
+    const response = await getClient().messages.create(params);
 
     if (response.stop_reason === "end_turn" || response.stop_reason === "max_tokens") {
       const text = response.content

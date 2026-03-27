@@ -1,22 +1,28 @@
 const fs = require("fs");
 const path = require("path");
 const { dataPath } = require("./src/data-dir");
+const { IS_PRODUCTION, loadConfigToEnv } = require("./src/config-store");
 
-// Ensure data/.env exists for fresh installs
-const envPath = dataPath(".env");
-if (!fs.existsSync(envPath)) {
-  fs.writeFileSync(envPath, [
-    "ZALO_BOT_TOKEN=",
-    "ANTHROPIC_API_KEY=",
-    "MY_CHAT_ID=",
-    "TOMTOM_API_KEY=",
-    "JIRA_API_TOKEN=",
-    "JIRA_EMAIL=",
-    ""
-  ].join("\n"));
-  console.log("[init] Created data/.env — fill in credentials via dashboard or edit directly.");
+if (!IS_PRODUCTION) {
+  // Local mode: use .env file
+  const envPath = dataPath(".env");
+  if (!fs.existsSync(envPath)) {
+    fs.writeFileSync(envPath, [
+      "ZALO_BOT_TOKEN=",
+      "ANTHROPIC_API_KEY=",
+      "MY_CHAT_ID=",
+      "TOMTOM_API_KEY=",
+      "JIRA_API_TOKEN=",
+      "JIRA_EMAIL=",
+      ""
+    ].join("\n"));
+    console.log("[init] Created data/.env -- fill in credentials via dashboard or edit directly.");
+  }
+  require("dotenv").config({ path: envPath, override: true });
 }
-require("dotenv").config({ path: envPath, override: true });
+
+// Load non-secret config from config.json (both modes)
+loadConfigToEnv();
 
 const ZaloBot = require("node-zalo-bot");
 const Anthropic = require("@anthropic-ai/sdk");
@@ -36,11 +42,19 @@ function saveChatId(chatId) {
   MY_CHAT_ID = String(chatId);
   process.env.MY_CHAT_ID = MY_CHAT_ID;
   state.zalo.chatId = MY_CHAT_ID;
-  const lines = fs.readFileSync(envPath, "utf8").split("\n");
-  const idx = lines.findIndex((l) => l.startsWith("MY_CHAT_ID="));
-  if (idx >= 0) lines[idx] = `MY_CHAT_ID=${MY_CHAT_ID}`;
-  else lines.push(`MY_CHAT_ID=${MY_CHAT_ID}`);
-  fs.writeFileSync(envPath, lines.join("\n"));
+  if (IS_PRODUCTION) {
+    // Production: persist to config.json (survives deploys)
+    const { writeConfig } = require("./src/config-store");
+    writeConfig({ MY_CHAT_ID });
+  } else {
+    // Local: persist to .env file
+    const envFile = dataPath(".env");
+    const lines = fs.readFileSync(envFile, "utf8").split("\n");
+    const idx = lines.findIndex((l) => l.startsWith("MY_CHAT_ID="));
+    if (idx >= 0) lines[idx] = `MY_CHAT_ID=${MY_CHAT_ID}`;
+    else lines.push(`MY_CHAT_ID=${MY_CHAT_ID}`);
+    fs.writeFileSync(envFile, lines.join("\n"));
+  }
   console.log(`[onboard] Chat ID saved: ${MY_CHAT_ID}`);
 }
 
@@ -63,7 +77,9 @@ bot
   .catch((err) => console.error("getMe failed:", err.message));
 
 function isOwner(msg) {
-  return String(msg.chat.id) === String(MY_CHAT_ID);
+  // Use process.env directly so dashboard changes take effect without restart
+  const currentId = process.env.MY_CHAT_ID || MY_CHAT_ID;
+  return String(msg.chat.id) === String(currentId);
 }
 
 function truncate(text) {

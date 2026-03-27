@@ -23,6 +23,7 @@ tom-the-lizard/
 |-- src/
 |   |-- bot-state.js          # Shared state singleton (messages, config, status)
 |   |-- claude-chat.js        # Claude API + Jira MCP tool-use loop
+|   |-- config-store.js       # Dual-mode config (local .env vs production config.json)
 |   |-- data-dir.js           # Data directory resolution (DATA_DIR env or ./data)
 |   |-- jira-client.js        # mcp-atlassian stdio client (Jira + Confluence)
 |   |-- scheduler.js          # Cron-based task runner (persists to tasks.json)
@@ -98,9 +99,17 @@ cd tom-the-lizard
 # Install dependencies
 npm install
 
+# Install uv (required for Jira/Confluence integration)
+# macOS
+brew install uv
+# or Linux/macOS (universal)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Start (opens onboarding wizard at localhost:3100)
 npm start
 ```
+
+> **Note**: `uv`/`uvx` is a Python package runner used to launch `mcp-atlassian` (the Jira/Confluence MCP server). If you skip this, everything works except Jira/Confluence queries. In Docker, `uv` is pre-installed.
 
 The onboarding wizard guides you through:
 1. Zalo Bot Token
@@ -133,6 +142,28 @@ Any other message is processed by Claude with Jira/Confluence tool access.
 | `JIRA_EMAIL` | Optional | Atlassian account email |
 | `JIRA_API_TOKEN` | Optional | Atlassian API token |
 | `JIRA_BASE_URL` | Optional | e.g. https://your-org.atlassian.net |
+
+## Deployment (Docker / Dokploy)
+
+```bash
+docker build -t tom-the-lizard .
+docker run -p 3100:3100 \
+  -e ZALO_BOT_TOKEN=... \
+  -e ANTHROPIC_API_KEY=... \
+  -v tom-data:/app/data \
+  tom-the-lizard
+```
+
+The app runs in two modes:
+
+| | Local | Production (`NODE_ENV=production`) |
+|---|---|---|
+| **Secrets** | Stored in `data/.env`, editable via dashboard | From `process.env` (Dokploy), dashboard shows locked |
+| **Config** (chat ID, Jira email/URL) | `data/.env` | `data/config.json` (editable via dashboard, persists across deploys) |
+| **Data files** | `data/` directory | `/app/data` volume mount |
+| **Token change detection** | Dashboard clears chat ID | SHA-256 hash comparison on startup auto-clears chat ID |
+
+Mount a persistent volume at `/app/data` to retain places, tasks, word config, generated scripts, and non-secret config across deploys.
 
 ## Tech Stack
 

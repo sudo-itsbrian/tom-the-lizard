@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // Usage: node send-zalo.js "Your message here"
 const { dataPath } = require("./src/data-dir");
+const { loadConfigToEnv } = require("./src/config-store");
 require("dotenv").config({ path: dataPath(".env"), override: true });
+loadConfigToEnv(); // Load MY_CHAT_ID from config.json in production
 const ZaloBot = require("node-zalo-bot");
 
 const msg = process.argv[2];
